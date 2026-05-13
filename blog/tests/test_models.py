@@ -3,47 +3,68 @@ from datetime import datetime
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from blog.models import Post
+from blog.models import Post, Comment
+
 
 class TestPostModel(TestCase):
-    def test_create_post(self):
-        user = get_user_model().objects.create_user(username='testuser', password='secret')
-        post = Post.objects.create(title="Пост", content='Контент', author=user)
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username='testuser', password='secret')
+        self.post = Post.objects.create(title="Пост", content='Контент', author=self.user)
 
-        self.assertIsNotNone(post.pk)
+    def test_create_post(self):
+        self.assertIsNotNone(self.post.pk)
         self.assertEqual(Post.objects.count(), 1)
-        self.assertEqual(post.title, 'Пост')
-        self.assertEqual(post.content, 'Контент')
-        self.assertEqual(post.author, user)
-        self.assertFalse(post.is_published)
+        self.assertEqual(self.post.title, 'Пост')
+        self.assertEqual(self.post.content, 'Контент')
+        self.assertEqual(self.post.author, self.user)
+        self.assertFalse(self.post.is_published)
 
     def test_str_returns_title(self):
-        user = get_user_model().objects.create_user(username='testuser', password='secret')
-        post = Post.objects.create(title="Пост", content='Контент', author=user)
-
-        self.assertEqual(str(post), post.title)
+        self.assertEqual(str(self.post), self.post.title)
 
     def test_publish_sets_is_published_true(self):
-        user = get_user_model().objects.create_user(username='testuser', password='secret')
-        post = Post.objects.create(title="Пост", content='Контент', author=user)
+        self.post.publish()
+        self.post.refresh_from_db()
 
-        post.publish()
-        post.refresh_from_db()
-
-        self.assertTrue(post.is_published)
+        self.assertTrue(self.post.is_published)
 
     def test_unpublish_sets_is_published_false(self):
-        user = get_user_model().objects.create_user(username='testuser', password='secret')
-        post = Post.objects.create(title="Пост", content='Контент', author=user)
+        self.post.unpublish()
+        self.post.refresh_from_db()
 
-        post.unpublish()
-        post.refresh_from_db()
-
-        self.assertFalse(post.is_published)
+        self.assertFalse(self.post.is_published)
 
     def test_auto_timestamps(self):
-        user = get_user_model().objects.create_user(username='testuser', password='secret')
-        post = Post.objects.create(title="Пост", content='Контент', author=user)
+        self.assertIsInstance(self.post.created_at, datetime)
+        self.assertIsInstance(self.post.updated_at, datetime)
 
-        self.assertIsInstance(post.created_at, datetime)
-        self.assertIsInstance(post.updated_at, datetime)
+
+class TestCommentModel(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username='testuser', password='secret')
+        self.post = Post.objects.create(title="Пост", content='Контент', author=self.user)
+        self.comment = Comment.objects.create(post=self.post, author=self.user,
+                                              content='Контент')
+
+    def test_create_comment(self):
+        self.assertIsNotNone(self.comment.pk)
+        self.assertEqual(Comment.objects.count(), 1)
+        self.assertEqual(self.comment.content, 'Контент')
+        self.assertEqual(self.comment.author, self.user)
+        self.assertEqual(self.comment.post, self.post)
+
+    def test_str_returns_content_preview(self):
+        self.assertEqual(str(self.comment), 'Контент')
+
+    def test_str_appends_ellipsis_for_long_content(self):
+        long_content = ('Спасибо за отличную статью! Очень помогла разобраться'
+                        'в сложной теме, теперь буду рекомендовать друзьям.')
+
+        self.assertGreater(len(long_content), 50)
+        comment = Comment.objects.create(author=self.user, post=self.post, content=long_content)
+        expected = long_content[:50] + '...'
+
+        self.assertEqual(str(comment), expected)
+
+    def test_comment_belongs_to_post(self):
+        self.assertEqual(self.comment.post, self.post)

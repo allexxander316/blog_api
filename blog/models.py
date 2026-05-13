@@ -23,3 +23,15 @@ class Post(models.Model):
         self.is_published = False
         self.save()
         return self
+
+
+class Comment(models.Model):
+    post = models.ForeignKey('Post', on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='comments')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        if len(self.content) > 50:
+            return self.content[:50] + '...'
+        return self.content
