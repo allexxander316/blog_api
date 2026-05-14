@@ -51,7 +51,7 @@ class TestPostAPI(TestCase):
         response = self.anonymous_client.post(reverse('post-list'), data, format='json')
 
         self.assertEqual(Post.objects.count(), 0)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
         self.assertIn('detail', response.data)
 
     def test_post_create_invalid_data(self):
@@ -94,7 +94,7 @@ class TestPostDetailView(TestCase):
         data = {'title': 'Новый заголовок', 'content': 'Содержимое поста'}
         response = self.anonymous_client.put(reverse('post-detail', kwargs={'pk': self.post.pk}), data, format='json')
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
         self.post.refresh_from_db()
         self.assertEqual(self.post.title, 'Заголовок')
 
@@ -110,7 +110,7 @@ class TestPostDetailView(TestCase):
 
         posts = Post.objects.count()
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
         self.assertEqual(posts, 1)
 
     def test_nonexistent_post(self):
@@ -157,7 +157,7 @@ class TestCommentAPI(TestCase):
         data = {'content': 'Новый комментарий'}
         response = self.anonymous_client.post(reverse('comment-list', kwargs={'post_pk': self.post.pk}), data)
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
         self.assertEqual(Comment.objects.count(), 0)
         self.assertIn('detail', response.data)
 

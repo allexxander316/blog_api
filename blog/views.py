@@ -50,6 +50,11 @@ class PostDetailAPIView(APIView):
         post.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def get_permissions(self):
+        if self.request.method in ('PUT', 'DELETE'):
+            return [IsAuthenticated()]
+        return []
+
 
 class CommentAPIView(APIView):
     def get(self, request, post_pk):
@@ -89,8 +94,13 @@ class CommentDetailAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk, post_pk):
-        comment = get_object_or_404(Comment, pk=pk)
+        comment = get_object_or_404(Comment, pk=pk, post_id=post_pk)
         if comment.author != request.user:
             return Response({"detail": 'Доступ запрещен'}, status=status.HTTP_403_FORBIDDEN)
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def get_permissions(self):
+        if self.request.method in ('PUT', 'DELETE'):
+            return [IsAuthenticated()]
+        return []
