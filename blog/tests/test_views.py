@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from blog.models import Post
+from blog.models import Post, Comment
 
 
 class TestPostAPI(TestCase):
@@ -111,3 +111,52 @@ class TestPostDetailView(TestCase):
     def test_nonexistent_post(self):
         response = self.client.get(reverse('post-detail', kwargs={'pk': 999}))
         self.assertEqual(response.status_code, 404)
+
+
+class TestCommentAPI(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username='testuser', password='secret')
+        self.post = Post.objects.create(title='Заголовок', content='Содержимое поста', author=self.user)
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_get_empty_comments(self):
+        response = self.client.get(reverse('comment-list', kwargs={'post_pk': self.post.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [])
+
+    def test_get_comments_list(self):
+        Comment.objects.create(content='Содержимое комментария', author=self.user, post=self.post)
+        Comment.objects.create(content='Содержимое комментария 2', author=self.user, post=self.post)
+
+        response = self.client.get(reverse('comment-list', kwargs={'post_pk': self.post.pk}))
+        comments = [comment['content'] for comment in response.data]
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+        self.assertIn('Содержимое комментария', comments)
+        self.assertIn('Содержимое комментария 2', comments)
+
+    def test_post_create_comment_authenticated(self):
+        data = {'content': 'Новый комментарий'}
+        response = self.client.post(reverse('comment-list', kwargs={'post_pk': self.post.pk}), data)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Comment.objects.count(), 1)
+        self.assertEqual('Новый комментарий', response.data['content'])
+
+    def test_anonymous_cant_create_comment(self):
+        self.client.force_authenticate(user=None)
+        data = {'content': 'Новый комментарий'}
+        response = self.client.post(reverse('comment-list', kwargs={'post_pk': self.post.pk}), data)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Comment.objects.count(), 0)
+        self.assertIn('detail', response.data)
+
+    def test_post_create_comment_invalid_data(self):
+        data = {}
+        response = self.client.post(reverse('comment-list', kwargs={'post_pk': self.post.pk}), data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Comment.objects.count(), 0)
+        self.assertIn('content', response.data)
