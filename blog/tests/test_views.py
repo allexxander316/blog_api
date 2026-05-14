@@ -10,6 +10,7 @@ class TestPostAPI(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = get_user_model().objects.create_user(username='testuser', password='secret')
+        self.client.force_authenticate(user=self.user)
 
     def test_get_empty_post(self):
         response = self.client.get(reverse('post-list'))
@@ -32,7 +33,6 @@ class TestPostAPI(TestCase):
             'title': 'Пост 1',
             'content': 'Содержание поста',
         }
-        self.client.login(username='testuser', password='secret')
         response = self.client.post(reverse('post-list'), data, format='json')
 
         self.assertEqual(response.status_code, 201)
@@ -44,6 +44,7 @@ class TestPostAPI(TestCase):
             'title': 'Пост 1',
             'content': 'Содержание поста',
         }
+        self.client.force_authenticate(user=None)
         response = self.client.post(reverse('post-list'), data, format='json')
 
         self.assertEqual(Post.objects.count(), 0)
@@ -54,7 +55,6 @@ class TestPostAPI(TestCase):
         data = {
             'content': 'Содержание поста',
         }
-        self.client.login(username='testuser', password='secret')
         response = self.client.post(reverse('post-list'), data, format='json')
 
         self.assertEqual(Post.objects.count(), 0)
