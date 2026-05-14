@@ -1,59 +1,39 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import status
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.viewsets import ModelViewSet
 
 from blog.models import Post, Comment
 from blog.serializers import PostSerializer, CommentSerializer
 
 
-class PostListAPIView(APIView):
-    def get(self, request) -> 'Response':
-        posts = Post.objects.all()
-        serializer = PostSerializer(posts, many=True)
-        return Response(serializer.data)
+class PostViewSet(ModelViewSet):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
 
-    def post(self, request):
-        serializer = PostSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(author=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
 
-    def get_permissions(self):
-        if self.request.method == 'POST':
-            return [IsAuthenticated()]
-        return []
+    def update(self, request, *args, **kwargs):
+        # post = Post.objects.get(pk=self.kwargs.get('pk'))
+        instance = self.get_object()
+        if instance.author == request.user:
+            return super().update(request, *args, **kwargs)
+        return Response(status=status.HTTP_403_FORBIDDEN)
 
-
-class PostDetailAPIView(APIView):
-    def get(self, request, pk):
-        post = get_object_or_404(Post, pk=pk)
-        serializer = PostSerializer(post)
-        return Response(serializer.data)
-
-    def put(self, request, pk):
-        post = get_object_or_404(Post, pk=pk)
-        if post.author != request.user:
-            return Response({"detail": 'Доступ запрещен'}, status=status.HTTP_403_FORBIDDEN)
-        serializer = PostSerializer(instance=post, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, pk):
-        post = get_object_or_404(Post, pk=pk)
-        if post.author != request.user:
-            return Response({"detail": 'Доступ запрещен'}, status=status.HTTP_403_FORBIDDEN)
-        post.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.author == request.user:
+            return super().destroy(request, *args, **kwargs)
+        return Response(status=status.HTTP_403_FORBIDDEN)
 
     def get_permissions(self):
-        if self.request.method in ('PUT', 'DELETE'):
-            return [IsAuthenticated()]
-        return []
+        if self.action in ('list', 'retrieve'):
+            return []
+        return [IsAuthenticated()]
 
 
 class CommentAPIView(APIView):
