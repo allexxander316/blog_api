@@ -98,6 +98,16 @@ class TestPostDetailView(TestCase):
         self.post.refresh_from_db()
         self.assertEqual(self.post.title, 'Заголовок')
 
+    def test_non_author_cannot_update_post(self):
+        other_user = get_user_model().objects.create_user(username='otheruser', password='secret')
+        data = {'title': 'Новый заголовок', 'content': 'Содержимое поста'}
+        self.client.force_authenticate(user=other_user)
+        response = self.client.put(reverse('post-detail', kwargs={'pk': self.post.pk}), data, format='json')
+
+        self.assertEqual(response.status_code, 403)
+        self.post.refresh_from_db()
+        self.assertNotEqual(self.post.title, data['title'])
+
     def test_author_can_delete_own_post(self):
         response = self.client.delete(reverse('post-detail', kwargs={'pk': self.post.pk}))
         posts = Post.objects.count()
@@ -112,6 +122,13 @@ class TestPostDetailView(TestCase):
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(posts, 1)
+
+    def test_non_author_cannot_delete_post(self):
+        other_user = get_user_model().objects.create_user(username='otheruser', password='secret')
+        self.client.force_authenticate(user=other_user)
+        response = self.client.delete(reverse('post-detail', kwargs={'pk': self.post.pk}))
+
+        self.assertEqual(response.status_code, 403)
 
     def test_nonexistent_post(self):
         response = self.client.get(reverse('post-detail', kwargs={'pk': 999}))
@@ -196,6 +213,13 @@ class TestCommentDetailAPI(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.comment.content, data['content'])
         self.assertEqual(self.comment.author, self.user)
+
+    def test_update_comment_invalid(self):
+        data = {}
+        response = self.client.put(reverse('comment-detail', kwargs={'pk': self.comment.pk,
+                                                                     'post_pk': self.post.pk}), data)
+        self.comment.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
 
     def test_non_author_cannot_update_comment(self):
         other_user = get_user_model().objects.create_user(username='otheruser', password='secret')
