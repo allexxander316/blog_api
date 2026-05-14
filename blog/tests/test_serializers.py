@@ -7,8 +7,11 @@ from blog.models import Post, Comment
 
 
 class TestPostSerializer(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(username='testuser', password='secret')
+
     def setUp(self):
-        self.user = get_user_model().objects.create_user(username='testuser', password='secret')
         self.valid_data = {
             'title': 'Заголовок',
             'content': 'Содержание поста',
@@ -47,9 +50,12 @@ class TestPostSerializer(TestCase):
 
 
 class TestCommentSerializer(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(username='testuser', password='secret')
+        cls.post = Post.objects.create(title='Заголовок', content='Содержание поста', author=cls.user)
+
     def setUp(self):
-        self.user = get_user_model().objects.create_user(username='testuser', password='secret')
-        self.post = Post.objects.create(title='Заголовок', content='Содержание поста', author=self.user)
         self.valid_data = {'content': 'Содержание комментария'}
 
     def test_serializer_valid_data(self):

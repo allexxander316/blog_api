@@ -7,8 +7,11 @@ from blog.models import Post, Comment
 
 
 class TestPostModel(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(username='testuser', password='secret')
+
     def setUp(self):
-        self.user = get_user_model().objects.create_user(username='testuser', password='secret')
         self.post = Post.objects.create(title="Пост", content='Контент', author=self.user)
 
     def test_create_post(self):
@@ -40,9 +43,12 @@ class TestPostModel(TestCase):
 
 
 class TestCommentModel(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(username='testuser', password='secret')
+        cls.post = Post.objects.create(title="Пост", content='Контент', author=cls.user)
+
     def setUp(self):
-        self.user = get_user_model().objects.create_user(username='testuser', password='secret')
-        self.post = Post.objects.create(title="Пост", content='Контент', author=self.user)
         self.comment = Comment.objects.create(post=self.post, author=self.user,
                                               content='Контент')
 
@@ -58,7 +64,7 @@ class TestCommentModel(TestCase):
 
     def test_str_appends_ellipsis_for_long_content(self):
         long_content = ('Спасибо за отличную статью! Очень помогла разобраться'
-                        'в сложной теме, теперь буду рекомендовать друзьям.')
+                        ' в сложной теме, теперь буду рекомендовать друзьям.')
 
         self.assertGreater(len(long_content), 50)
         comment = Comment.objects.create(author=self.user, post=self.post, content=long_content)

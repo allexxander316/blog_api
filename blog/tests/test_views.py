@@ -7,9 +7,13 @@ from blog.models import Post, Comment
 
 
 class TestPostAPI(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.anonymous_client = APIClient()
+        cls.user = get_user_model().objects.create_user(username='testuser', password='secret')
+
     def setUp(self):
         self.client = APIClient()
-        self.user = get_user_model().objects.create_user(username='testuser', password='secret')
         self.client.force_authenticate(user=self.user)
 
     def test_get_empty_post(self):
@@ -44,8 +48,7 @@ class TestPostAPI(TestCase):
             'title': 'Пост 1',
             'content': 'Содержание поста',
         }
-        self.client.force_authenticate(user=None)
-        response = self.client.post(reverse('post-list'), data, format='json')
+        response = self.anonymous_client.post(reverse('post-list'), data, format='json')
 
         self.assertEqual(Post.objects.count(), 0)
         self.assertEqual(response.status_code, 403)
@@ -63,8 +66,12 @@ class TestPostAPI(TestCase):
 
 
 class TestPostDetailView(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(username='testuser', password='secret')
+        cls.anonymous_client = APIClient()
+
     def setUp(self):
-        self.user = get_user_model().objects.create_user(username='testuser', password='secret')
         self.post = Post.objects.create(title='Заголовок', content='Содержимое поста', author=self.user)
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
@@ -83,10 +90,9 @@ class TestPostDetailView(TestCase):
         self.assertEqual(self.post.title, 'Новый заголовок')
         self.assertEqual(response.data['title'], 'Новый заголовок')
 
-    def test_anonymous_cant_update_post(self):
-        self.client.force_authenticate(user=None)
+    def test_anonymous_cannot_update_post(self):
         data = {'title': 'Новый заголовок', 'content': 'Содержимое поста'}
-        response = self.client.put(reverse('post-detail', kwargs={'pk': self.post.pk}), data, format='json' )
+        response = self.anonymous_client.put(reverse('post-detail', kwargs={'pk': self.post.pk}), data, format='json')
 
         self.assertEqual(response.status_code, 403)
         self.post.refresh_from_db()
@@ -99,9 +105,8 @@ class TestPostDetailView(TestCase):
         self.assertEqual(response.status_code, 204)
         self.assertEqual(posts, 0)
 
-    def test_anonymous_cant_delete_post(self):
-        self.client.force_authenticate(user=None)
-        response = self.client.delete(reverse('post-detail', kwargs={'pk': self.post.pk}))
+    def test_anonymous_cannot_delete_post(self):
+        response = self.anonymous_client.delete(reverse('post-detail', kwargs={'pk': self.post.pk}))
 
         posts = Post.objects.count()
 
@@ -114,9 +119,13 @@ class TestPostDetailView(TestCase):
 
 
 class TestCommentAPI(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(username='testuser', password='secret')
+        cls.post = Post.objects.create(title='Заголовок', content='Содержимое поста', author=cls.user)
+        cls.anonymous_client = APIClient()
+
     def setUp(self):
-        self.user = get_user_model().objects.create_user(username='testuser', password='secret')
-        self.post = Post.objects.create(title='Заголовок', content='Содержимое поста', author=self.user)
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
@@ -145,9 +154,8 @@ class TestCommentAPI(TestCase):
         self.assertEqual('Новый комментарий', response.data['content'])
 
     def test_anonymous_cant_create_comment(self):
-        self.client.force_authenticate(user=None)
         data = {'content': 'Новый комментарий'}
-        response = self.client.post(reverse('comment-list', kwargs={'post_pk': self.post.pk}), data)
+        response = self.anonymous_client.post(reverse('comment-list', kwargs={'post_pk': self.post.pk}), data)
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(Comment.objects.count(), 0)
@@ -163,9 +171,12 @@ class TestCommentAPI(TestCase):
 
 
 class TestCommentDetailAPI(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(username='testuser', password='secret')
+        cls.post = Post.objects.create(title='Заголовок', content='Содержимое поста', author=cls.user)
+
     def setUp(self):
-        self.user = get_user_model().objects.create_user(username='testuser', password='secret')
-        self.post = Post.objects.create(title='Заголовок', content='Содержимое поста', author=self.user)
         self.comment = Comment.objects.create(content='Содержимое комментария', author=self.user, post=self.post)
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
@@ -200,7 +211,7 @@ class TestCommentDetailAPI(TestCase):
 
     def test_author_can_delete_comment(self):
         response = self.client.delete(reverse('comment-detail', kwargs={'pk': self.comment.pk,
-                                                                     'post_pk': self.post.pk}))
+                                                                        'post_pk': self.post.pk}))
         comments = Comment.objects.count()
 
         self.assertEqual(response.status_code, 204)
