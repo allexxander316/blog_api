@@ -160,3 +160,64 @@ class TestCommentAPI(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Comment.objects.count(), 0)
         self.assertIn('content', response.data)
+
+
+class TestCommentDetailAPI(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username='testuser', password='secret')
+        self.post = Post.objects.create(title='Заголовок', content='Содержимое поста', author=self.user)
+        self.comment = Comment.objects.create(content='Содержимое комментария', author=self.user, post=self.post)
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_get_comment_detail(self):
+        response = self.client.get(reverse('comment-detail', kwargs={'pk': self.comment.pk,
+                                                                     'post_pk': self.post.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['content'], self.comment.content)
+
+    def test_author_can_update_comment(self):
+        data = {'content': 'Новое содержимое комментария'}
+        response = self.client.put(reverse('comment-detail', kwargs={'pk': self.comment.pk,
+                                                                     'post_pk': self.post.pk}), data)
+        self.comment.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.comment.content, data['content'])
+        self.assertEqual(self.comment.author, self.user)
+
+    def test_non_author_cannot_update_comment(self):
+        other_user = get_user_model().objects.create_user(username='otheruser', password='secret')
+        self.client.force_authenticate(user=other_user)
+        data = {'content': 'Новое содержимое комментария'}
+        response = self.client.put(reverse('comment-detail', kwargs={'pk': self.comment.pk,
+                                                                     'post_pk': self.post.pk}))
+        self.comment.refresh_from_db()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotEqual(self.comment.content, data['content'])
+        self.assertIn('detail', response.data)
+
+    def test_author_can_delete_comment(self):
+        response = self.client.delete(reverse('comment-detail', kwargs={'pk': self.comment.pk,
+                                                                     'post_pk': self.post.pk}))
+        comments = Comment.objects.count()
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(comments, 0)
+
+    def test_non_author_cannot_delete_comment(self):
+        other_user = get_user_model().objects.create(username='otheruser', password='secret')
+        self.client.force_authenticate(user=other_user)
+        response = self.client.delete(reverse('comment-detail', kwargs={'pk': self.comment.pk,
+                                                                        'post_pk': self.post.pk}))
+
+        comments = Comment.objects.count()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(comments, 1)
+
+    def test_get_nonexistent_comment(self):
+        response = self.client.get(reverse('comment-detail', kwargs={'pk': 999, 'post_pk': self.post.pk}))
+
+        self.assertEqual(response.status_code, 404)
